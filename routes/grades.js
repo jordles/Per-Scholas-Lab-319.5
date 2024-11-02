@@ -6,7 +6,6 @@ const router = express.Router()
 // base path: /grades
 
 
-
 // Backwards compatibility or students/learners
 router.get("/student/:id", (req, res) => {
   res.redirect(`../learner/${req.params.id}`)

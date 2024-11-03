@@ -1,3 +1,2 @@
-# Per Scholas Lab 319.4 Aggregation, Indexes, and Validation
+# Per Scholas Lab 319.5 Working with Mongoose
 
-Working with MongoDb. **I placed my validation in mongodb compass, the manual one on nodejs driver does not work. **

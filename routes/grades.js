@@ -388,8 +388,25 @@ router.patch('/:id/add', async (req, res, next) => {
   try {
     let query = { _id: req.params.id }
 
+    // let result = await Grades.updateOne(query, {
+    //   $push: { scores: req.body }
+    // })
+    let result = await Grades.findByIdAndUpdate(req.params.id, req.body, {new: true})
+
+    if (!result) res.send("Not Found").status(404)
+    else res.send(result).status(200)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Remove a score from a grade entry
+router.patch('/:id/remove', async (req, res, next) => {
+  try {
+    let query = { _id: req.params.id }
+
     let result = await Grades.updateOne(query, {
-      $push: { scores: req.body }
+      $pull: { scores: req.body }
     })
 
     if (!result) res.send("Not Found").status(404)
@@ -399,47 +416,30 @@ router.patch('/:id/add', async (req, res, next) => {
   }
 })
 
-// // Remove a score from a grade entry
-// router.patch('/:id/remove', async (req, res, next) => {
+// Extra Route to combine the two above Add/Remove
+// router.patch('/:id/:operation', async (req, res, next) => {
 //   try {
 //     let collection = db.collection("grades");
 //     let query = { _id: ObjectId.createFromHexString(req.params.id) }
+//     let update = {};
 
-//     let result = await collection.updateOne(query, {
-//       $pull: { scores: req.body }
-//     })
+//     if (req.params.operation === "add") {
+//       update["$push"] = { scores: req.body }
+//     } else if (req.params.operation === "remove") {
+//       update["$pull"] = { scores: req.body }
+//     } else {
+//       res.status(400).send("Invalid Operation")
+//       return
+//     }
+
+//     let result = await collection.updateOne(query, update)
 
 //     if (!result) res.send("Not Found").status(404)
 //     else res.send(result).status(200)
 //   } catch (err) {
 //     next(err)
 //   }
-// })
-
-// // Extra Route to combine the two above Add/Remove
-// // router.patch('/:id/:operation', async (req, res, next) => {
-// //   try {
-// //     let collection = db.collection("grades");
-// //     let query = { _id: ObjectId.createFromHexString(req.params.id) }
-// //     let update = {};
-
-// //     if (req.params.operation === "add") {
-// //       update["$push"] = { scores: req.body }
-// //     } else if (req.params.operation === "remove") {
-// //       update["$pull"] = { scores: req.body }
-// //     } else {
-// //       res.status(400).send("Invalid Operation")
-// //       return
-// //     }
-
-// //     let result = await collection.updateOne(query, update)
-
-// //     if (!result) res.send("Not Found").status(404)
-// //     else res.send(result).status(200)
-// //   } catch (err) {
-// //     next(err)
-// //   }
-// // // })
+// // })
 
 // router.patch("/class/:id", async (req, res, next) => {
 //   try {
@@ -460,47 +460,45 @@ router.patch('/:id/add', async (req, res, next) => {
 
 
 
-// router.delete("/:id", async (req, res, next) => {
-//   try {
-//     let collection = db.collection("grades");
-//     let query = { _id: ObjectId.createFromHexString(req.params.id) }
-//     let result = await collection.deleteOne(query)
+router.delete("/:id", async (req, res, next) => {
+  try {
+    let query = { _id: req.params.id }
+    let result = await Grades.deleteOne(query)
 
-//     if (!result) res.send("Not Found").status(404)
-//     else res.send(result).status(200)
-//   } catch (err) {
-//     next(err)
-//   }
-// })
-// // Delete a learner's grade entries
-// router.delete("/learner/:id", async (req, res, next) => {
-//   try {
-//     let collection = db.collection("grades")
-//     let query = { learner_id: Number(req.params.id)}
+    if (!result) res.send("Not Found").status(404)
+    else res.send(result).status(200)
+  } catch (err) {
+    next(err)
+  }
+})
 
-//     let result = await collection.deleteMany(query)
+// Delete a learner's grade entries
+router.delete("/learner/:id", async (req, res, next) => {
+  try {
+    let query = { learner_id: req.params.id}
 
-//     if (!result) res.send("Not Found").status(404)
-//     else res.send(result).status(200)
-//   } catch (err) {
-//     next(err)
-//   }
-// })
+    let result = await Grades.deleteMany(query)
 
-// // Delete a class's grade entries
-// router.delete("/class/:id", async (req, res, next) => {
-//   try {
-//     let collection = db.collection("grades")
-//     let query = { class_id: Number(req.params.id)}
+    if (!result) res.send("Not Found").status(404)
+    else res.send(result).status(200)
+  } catch (err) {
+    next(err)
+  }
+})
 
-//     let result = await collection.deleteMany(query)
+// Delete a class's grade entries
+router.delete("/class/:id", async (req, res, next) => {
+  try {
+    let query = { class_id: req.params.id}
 
-//     if (!result) res.send("Not Found").status(404)
-//     else res.send(result).status(200)
-//   } catch (err) {
-//     next(err)
-//   }
-// })
+    let result = await Grades.deleteMany(query)
+
+    if (!result) res.send("Not Found").status(404)
+    else res.send(result).status(200)
+  } catch (err) {
+    next(err)
+  }
+})
 
 
 

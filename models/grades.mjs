@@ -13,7 +13,16 @@ const gradesSchema = new mongoose.Schema({
     max: 300,
     message: "must be an integer between 0 and 300 and is required",
     required: true
-  } 
+  },
+  scores: [ //mongoose gives its own _id field for arrays
+    {
+      type: { 
+        type: String,
+        enum: ['exam', 'homework', 'quiz'] 
+      },
+      score: Number,
+    },
+  ],
 }, { versionKey: false }) // Disables the __v field ;
 
 

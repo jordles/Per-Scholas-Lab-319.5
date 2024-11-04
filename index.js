@@ -1,6 +1,7 @@
-import express from 'express';
+import express from 'express'; //for out routes
+import mongoose from 'mongoose'; //for our database used with models
 import 'dotenv/config';
-import db from './db/conn.mjs'
+// import db from './db/conn.mjs' //no longer using mongodb
 import grades from './routes/grades.js';
 
 const app = express();
@@ -8,47 +9,55 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use("/grades", grades);
+// await mongoose.connect(process.env.ATLAS_URI);
+try {
+  await mongoose.connect(process.env.ATLAS_URI);
+  console.log("Mongoose connected to the database successfully");
+} catch (err) {
+  console.error("Mongoose connection error:", err);
+}
 
-async () => { //this validation doesn't work on nodejs driver but it works in mongodb compass
-  await db.command({
-    collMod: "grades",
-    // Pass the validator object
-    validator: {
-      $jsonSchema: {
-        bsonType: "object",
-        title: "Learner Validation",
-        required: ["learner_id", "class_id"],
-        properties: {
-          learner_id: {
-            bsonType: "int",
-            minimum: 0,
-            description: "must be an integer greater than or equal to 0 and is required",
-          },
-          class_id: {
-            bsonType: "int",
-            minimum: 0,
-            maximum: 300,
-            description: "must be an integer between 0 and 300 and is required",
-          }
-        },
-      },
-    },
-    validationAction: "warn",
-  });
-};
+
+// async () => { //this validation doesn't work on nodejs driver but it works in mongodb compass
+//   await db.command({
+//     collMod: "grades",
+//     // Pass the validator object
+//     validator: {
+//       $jsonSchema: {
+//         bsonType: "object",
+//         title: "Learner Validation",
+//         required: ["learner_id", "class_id"],
+//         properties: {
+//           learner_id: {
+//             bsonType: "int",
+//             minimum: 0,
+//             description: "must be an integer greater than or equal to 0 and is required",
+//           },
+//           class_id: {
+//             bsonType: "int",
+//             minimum: 0,
+//             maximum: 300,
+//             description: "must be an integer between 0 and 300 and is required",
+//           }
+//         },
+//       },
+//     },
+//     validationAction: "warn",
+//   });
+// };
 
 
 app.get("/", async (req, res) => {
-  let collection = db.collection("grades");
-  let newDocument = {
-    learner_id: 1,
-    class_id: 301,
-  }
-  let result = await collection.insertOne(newDocument).catch( e => {
-    return e.errInfo.details.schemaRulesNotSatisfied;
-  });
-  res.send(result).status(204);
-  // res.send("Welcome to the API.");
+  // let collection = db.collection("grades");
+  // let newDocument = {
+  //   learner_id: 1,
+  //   class_id: 301,
+  // }
+  // let result = await collection.insertOne(newDocument).catch( e => {
+  //   return e.errInfo.details.schemaRulesNotSatisfied;
+  // });
+  // res.send(result).status(204);
+  res.send("Welcome to the API.");
 });
 
 // Global error handling

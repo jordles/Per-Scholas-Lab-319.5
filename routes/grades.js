@@ -1,7 +1,7 @@
 import express from 'express';
-import db from '../db/conn.mjs'
-import { ObjectId } from 'mongodb';
-
+//import db from '../db/conn.mjs' // not using mongodb
+//import { ObjectId } from 'mongodb'; no longer using mongodb
+import Grades from '../models/grades.mjs'
 const router = express.Router()
 // base path: /grades
 
@@ -14,14 +14,12 @@ router.get("/student/:id", (req, res) => {
 // Get a student's grade data
 router.get('/learner/:id', async (req, res, next) => {
   try {
-    let collection = db.collection("grades")
-    let query = { learner_id: Number(req.params.id) }
-
+    let query = { learner_id: req.params.id }
     if (req.query.class) {
-      query.class_id = Number(req.query.class)
+      query.class_id = req.query.class
     }
 
-    let result = await collection.find(query).toArray()
+    const result = await Grades.find(query);
 
     if (!result) res.send("Not Found").status(404)
     else res.send(result).status(200)
@@ -33,14 +31,13 @@ router.get('/learner/:id', async (req, res, next) => {
 // Get a class's grade data
 router.get('/class/:id', async (req, res, next) => {
   try {
-    let collection = db.collection("grades")
-    let query = { class_id: Number(req.params.id) }
+    let query = { class_id: req.params.id}
 
     if (req.query.learner) {
-      query.learner_id = Number(req.query.learner)
+      query.learner_id = req.query.learner
     }
 
-    let result = await collection.find(query).toArray()
+    let result = await Grades.find(query)
 
     if (!result) res.send("Not Found").status(404)
     else res.send(result).status(200)
@@ -49,27 +46,32 @@ router.get('/class/:id', async (req, res, next) => {
   }
 })
 
-// get learner average for EACH class
 router.get("/learner/:id/class/average", async (req, res, next) => {
-  try {
-    let collection = db.collection("grades");
-    let query = { learner_id: Number(req.params.id)}
-    let learnerGrades = await collection.find(query).toArray()
-
-    const averages = learnerGrades.reduce((acc, grade) => {
-      let sum = 0;
-      for (let i = 0; i < grade.scores.length; i++) {
-        if (typeof grade.scores[i].score === 'number') {
-          sum += grade.scores[i].score        }
+  try{
+    let query = { learner_id: Number(req.params.id)};
+  
+    const result = await Grades.aggregate([
+      { $match: query }, // Filters documents by learner_id
+      { $unwind: "$scores" }, // Decomposes the scores array into individual documents
+      { 
+        $group: { 
+          _id: "$class_id", // Groups by class_id
+          average: { $avg: "$scores.score" } // Calculates the average score per class
+        } 
+      },
+      { 
+        $project: { 
+          _id: 0, // Excludes _id from the output
+          class_id: "$_id", // Renames _id to class_id for clarity
+          average: 1 // Includes the calculated average field
+        }
       }
-      acc[grade.class_id] = sum / grade.scores.length
-      return acc
-    }, {})
-
-    res.send(averages).status(200)
-
-  } catch (err) {
-    next(err)
+    ]);
+    if(!result) res.send("Not found").status(404);
+    else res.send(result).status(200);
+  }
+  catch(err){
+    next(err);
   }
 })
 
@@ -78,23 +80,31 @@ router.get("/learner/:id/class/average", async (req, res, next) => {
 // to get overall average of a learner
 router.get("/learner/:id/average", async (req, res, next) => {
   try {
-    let collection = db.collection("grades");
-    let query = { learner_id: Number(req.params.id)}
-    let learnerGrades = await collection.find(query).toArray()
-    let sum = 0;
-    let scoreCount = 0
-    for (let i = 0; i < learnerGrades.length; i++) {
-      for (let j = 0; j < learnerGrades[i].scores.length; j++) {
-        if (typeof learnerGrades[i].scores[j].score === 'number') {
-          sum += learnerGrades[i].scores[j].score
+    const result = await Grades.aggregate([
+      { 
+        $match: { learner_id: Number(req.params.id) } // Filters documents by learner_id 
+      },
+      { 
+        $unwind: "$scores" // Breaks down scores array to individual scores for averaging
+      },
+      { 
+        $group: {
+          _id: "$learner_id", // Groups by learner_id
+          overallAverage: { $avg: "$scores.score" } // Calculates average score across all entries
         }
-        scoreCount++
+      },
+      { 
+        $project: { 
+          _id: 0, 
+          learner_id: "$_id", 
+          overallAverage: 1 
+        } 
       }
-    }
+    ]);
 
-    const overallScore = sum / scoreCount
-
-    res.send("Over average: " + overallScore).status(200)
+    if (!result) res.status(404).send("Not found");
+    else res.status(200).send("Overall average: " + result[0].overallAverage);
+    
   } catch (err) {
     next(err)
   }
@@ -108,8 +118,7 @@ router.get("/learner/:id/average", async (req, res, next) => {
 
 router.get('/stats', async (req, res, next) => {
   try{
-    let collection = db.collection("grades");
-    let [result] = await collection.aggregate([
+    let [result] = await Grades.aggregate([
       {
         '$unwind': {
           'path': '$scores'
@@ -226,7 +235,7 @@ router.get('/stats', async (req, res, next) => {
           }
         }
       }
-    ]).toArray();
+    ]);
     console.log(result)
     if(!result) res.send("Not Found").status(404)
     else res.json(result).status(200)
@@ -238,8 +247,7 @@ router.get('/stats', async (req, res, next) => {
 
 router.get('/stats/:id', async (req, res, next) => {
   try {
-    let collection = db.collection("grades");
-    let [result] = await collection.aggregate([
+    let [result] = await Grades.aggregate([
       {
         '$match': {
           'class_id': Number(req.params.id)
@@ -333,7 +341,7 @@ router.get('/stats/:id', async (req, res, next) => {
           }
         }
       }
-    ]).toArray();
+    ]);
 
     console.log(result);
     if (!result) res.status(404).send("Not Found");
@@ -348,9 +356,8 @@ router.get('/stats/:id', async (req, res, next) => {
 // Get a single grade entry
 router.get('/:id', async (req, res, next) => {
   try {
-    let collection = db.collection("grades");
-    const query = { _id: ObjectId.createFromHexString(req.params.id) }
-    let result = await collection.findOne(query);
+    const query = { _id: req.params.id }
+    let result = await Grades.findOne(query);
 
     if (!result) res.send("Not Found").status(404)
     else res.send(result).status(200)
@@ -362,29 +369,26 @@ router.get('/:id', async (req, res, next) => {
 // Create a single grade entry
 router.post('/', async (req, res, next) => {
   try {
-    let collection = db.collection("grades");
     let newDocument = req.body
 
     if (newDocument.student_id) {
       newDocument.learner_id = newDocument.student_id;
       delete newDocument.student_id
     }
-
-    let result = await collection.insertOne(newDocument)
+    
+    let result = await Grades.create(newDocument)
     res.send(result).status(201)
   } catch (err) {
     next(err)
   }
 })
 
-
 // Add a score to a grade entry
 router.patch('/:id/add', async (req, res, next) => {
   try {
-    let collection = db.collection("grades");
-    let query = { _id: ObjectId.createFromHexString(req.params.id) }
+    let query = { _id: req.params.id }
 
-    let result = await collection.updateOne(query, {
+    let result = await Grades.updateOne(query, {
       $push: { scores: req.body }
     })
 
@@ -395,108 +399,108 @@ router.patch('/:id/add', async (req, res, next) => {
   }
 })
 
-// Remove a score from a grade entry
-router.patch('/:id/remove', async (req, res, next) => {
-  try {
-    let collection = db.collection("grades");
-    let query = { _id: ObjectId.createFromHexString(req.params.id) }
-
-    let result = await collection.updateOne(query, {
-      $pull: { scores: req.body }
-    })
-
-    if (!result) res.send("Not Found").status(404)
-    else res.send(result).status(200)
-  } catch (err) {
-    next(err)
-  }
-})
-
-// Extra Route to combine the two above Add/Remove
-// router.patch('/:id/:operation', async (req, res, next) => {
+// // Remove a score from a grade entry
+// router.patch('/:id/remove', async (req, res, next) => {
 //   try {
 //     let collection = db.collection("grades");
 //     let query = { _id: ObjectId.createFromHexString(req.params.id) }
-//     let update = {};
 
-//     if (req.params.operation === "add") {
-//       update["$push"] = { scores: req.body }
-//     } else if (req.params.operation === "remove") {
-//       update["$pull"] = { scores: req.body }
-//     } else {
-//       res.status(400).send("Invalid Operation")
-//       return
-//     }
-
-//     let result = await collection.updateOne(query, update)
+//     let result = await collection.updateOne(query, {
+//       $pull: { scores: req.body }
+//     })
 
 //     if (!result) res.send("Not Found").status(404)
 //     else res.send(result).status(200)
 //   } catch (err) {
 //     next(err)
 //   }
-// // })
+// })
 
-router.patch("/class/:id", async (req, res, next) => {
-  try {
-    let collection = db.collection("grades")
-    let query = { class_id: Number(req.params.id)}
+// // Extra Route to combine the two above Add/Remove
+// // router.patch('/:id/:operation', async (req, res, next) => {
+// //   try {
+// //     let collection = db.collection("grades");
+// //     let query = { _id: ObjectId.createFromHexString(req.params.id) }
+// //     let update = {};
 
-    let result = await collection.updateMany(query, {
-      $set: {class_id: req.body.class_id}
-    })
+// //     if (req.params.operation === "add") {
+// //       update["$push"] = { scores: req.body }
+// //     } else if (req.params.operation === "remove") {
+// //       update["$pull"] = { scores: req.body }
+// //     } else {
+// //       res.status(400).send("Invalid Operation")
+// //       return
+// //     }
 
-    if (!result) res.send("Not found").status(404);
-    else res.send(result).status(200);
-  } catch (err) {
-    next(err)
-  }
-})
+// //     let result = await collection.updateOne(query, update)
+
+// //     if (!result) res.send("Not Found").status(404)
+// //     else res.send(result).status(200)
+// //   } catch (err) {
+// //     next(err)
+// //   }
+// // // })
+
+// router.patch("/class/:id", async (req, res, next) => {
+//   try {
+//     let collection = db.collection("grades")
+//     let query = { class_id: Number(req.params.id)}
+
+//     let result = await collection.updateMany(query, {
+//       $set: {class_id: req.body.class_id}
+//     })
+
+//     if (!result) res.send("Not found").status(404);
+//     else res.send(result).status(200);
+//   } catch (err) {
+//     next(err)
+//   }
+// })
 
 
 
 
-router.delete("/:id", async (req, res, next) => {
-  try {
-    let collection = db.collection("grades");
-    let query = { _id: ObjectId.createFromHexString(req.params.id) }
-    let result = await collection.deleteOne(query)
+// router.delete("/:id", async (req, res, next) => {
+//   try {
+//     let collection = db.collection("grades");
+//     let query = { _id: ObjectId.createFromHexString(req.params.id) }
+//     let result = await collection.deleteOne(query)
 
-    if (!result) res.send("Not Found").status(404)
-    else res.send(result).status(200)
-  } catch (err) {
-    next(err)
-  }
-})
-// Delete a learner's grade entries
-router.delete("/learner/:id", async (req, res, next) => {
-  try {
-    let collection = db.collection("grades")
-    let query = { learner_id: Number(req.params.id)}
+//     if (!result) res.send("Not Found").status(404)
+//     else res.send(result).status(200)
+//   } catch (err) {
+//     next(err)
+//   }
+// })
+// // Delete a learner's grade entries
+// router.delete("/learner/:id", async (req, res, next) => {
+//   try {
+//     let collection = db.collection("grades")
+//     let query = { learner_id: Number(req.params.id)}
 
-    let result = await collection.deleteMany(query)
+//     let result = await collection.deleteMany(query)
 
-    if (!result) res.send("Not Found").status(404)
-    else res.send(result).status(200)
-  } catch (err) {
-    next(err)
-  }
-})
+//     if (!result) res.send("Not Found").status(404)
+//     else res.send(result).status(200)
+//   } catch (err) {
+//     next(err)
+//   }
+// })
 
-// Delete a class's grade entries
-router.delete("/class/:id", async (req, res, next) => {
-  try {
-    let collection = db.collection("grades")
-    let query = { class_id: Number(req.params.id)}
+// // Delete a class's grade entries
+// router.delete("/class/:id", async (req, res, next) => {
+//   try {
+//     let collection = db.collection("grades")
+//     let query = { class_id: Number(req.params.id)}
 
-    let result = await collection.deleteMany(query)
+//     let result = await collection.deleteMany(query)
 
-    if (!result) res.send("Not Found").status(404)
-    else res.send(result).status(200)
-  } catch (err) {
-    next(err)
-  }
-})
+//     if (!result) res.send("Not Found").status(404)
+//     else res.send(result).status(200)
+//   } catch (err) {
+//     next(err)
+//   }
+// })
 
 
 
